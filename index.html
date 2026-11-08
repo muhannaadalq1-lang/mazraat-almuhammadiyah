@@ -238,6 +238,18 @@ textarea{min-height:70px;resize:vertical}
 button.spec{cursor:pointer;justify-content:center;color:var(--muted);font:inherit}
 .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
 .opt{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface);cursor:pointer;text-align:center}
+.night{display:flex;align-items:center;gap:12px;width:100%;border:1.5px dashed var(--line);border-radius:14px;padding:12px 14px;background:var(--surface);cursor:pointer;text-align:right;color:var(--fg);font:inherit}
+.night .mi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);color:#5b5fb0;flex:none}
+.night .mi svg{width:22px;height:22px}
+.night .nt{display:grid;flex:1;line-height:1.5}
+.night .nt small{color:var(--muted);font-size:12px}
+.night .nf{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.night .sw{width:44px;height:26px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .2s}
+.night .sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:right .2s}
+.night[aria-pressed="true"]{border-style:solid;border-color:#5b5fb0;background:rgba(91,95,176,.08)}
+.night[aria-pressed="true"] .mi{background:#5b5fb0;color:#fff}
+.night[aria-pressed="true"] .sw{background:#5b5fb0}
+.night[aria-pressed="true"] .sw::after{right:21px}
 .opt[aria-pressed="true"]{background:var(--teal);color:var(--on-teal);border-color:var(--teal)}
 .facts{background:var(--surface-2);border-radius:14px;padding:2px 14px;display:grid}
 .fact{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
@@ -827,6 +839,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
         <form id="offForm" class="mini-form" style="border:0;padding:0">
           <label for="oMid">خصم وسط الأسبوع (الأحد – الأربعاء) ٪<input id="oMid" type="number" min="0" max="90" inputmode="numeric" placeholder="0 = بدون خصم"></label>
           <div class="row2"><label for="oEvery">خصم الولاء: كل كم زيارة<input id="oEvery" type="number" min="2" inputmode="numeric" placeholder="مثال: 5"></label><label for="oLoy">نسبة خصم الولاء ٪<input id="oLoy" type="number" min="0" max="100" inputmode="numeric"></label></div>
+          <div class="row3"><label for="oN1">المبيت لقسم واحد<input id="oN1" type="number" min="0" inputmode="numeric"></label><label for="oN2">المبيت للقسمين<input id="oN2" type="number" min="0" inputmode="numeric"></label><label for="oNOut">خروج المبيت<input id="oNOut" placeholder="١٠:٠٠ صباحًا"></label></div>
           <label for="oSec">تأمين مسترد يُدفع عند الوصول (ريال)<input id="oSec" type="number" min="0" inputmode="numeric" placeholder="0 = بدون تأمين"></label>
           <p class="note">بطاقات الهدايا تضيفها من «كوبونات الخصم» بنوع «بطاقة هدية». باقات المناسبات (خطوبة، تخرج، اجتماع عمل) تضيفها من «الباقات».</p>
           <button class="btn sm" type="submit">احفظ</button><div id="offMsg" hidden></div>
@@ -915,6 +928,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
         <div class="specs" id="shSpecs"></div>
         <h3 style="font-size:21px">اختر الباقة</h3>
         <div class="opts" id="shOpts"></div>
+        <div class="night-slot"></div>
         <div class="facts" id="shFacts"></div>
         <details class="qa" id="shRules" hidden><summary>تعليمات الإقامة</summary><p id="shRulesText"></p></details>
         <div id="shMedia" style="display:grid;gap:10px"><h3 style="font-size:21px" id="shMediaTitle">الصور</h3><div class="gal sh-gal" id="shGal"></div></div>
@@ -946,6 +960,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
         <div id="waitBox" class="panel" hidden><strong id="waitTitle"></strong><p class="note">سجّل في قائمة الانتظار ونبلغك عبر واتساب إذا انفتح.</p>
           <form id="waitForm" class="row2" novalidate><input id="wName" placeholder="اسمك" aria-label="اسمك"><input id="wPhone" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" aria-label="رقم الجوال"><button class="btn sm" type="submit" style="grid-column:1/-1">سجّلني في قائمة الانتظار</button></form>
           <p class="msg" id="waitDone" hidden>سجّلناك. نبلغك إذا انفتح هذا اليوم.</p><div id="waitMsg" hidden></div></div>
+        <div class="night-slot"></div>
         <div id="selBox" hidden><strong>الوقت المحدد</strong><div class="facts" id="selFacts"></div></div>
         <div class="sticky-cta"><button class="btn block-btn" type="button" id="toStep3" disabled>إضافة إلى الحجز</button></div>
       </div>
@@ -1155,15 +1170,31 @@ function basePrice(p, k){
   const v = isWeekend(parseKey(k)) ? (p.we||p.wd) : (p.wd||p.we); return v ? Number(v) : null;
 }
 function dayOpen(p, k){ return !Array.isArray(p.days) || basePrice(p,k)!==null; }
+/* overnight stay: optional add-on per section, extends check-out */
+const nightCfg = ()=> state.settings.overnight || {};
+const nightFee = sec => Number(nightCfg()[sec]) || 0;
+const nightOn = ()=> !!state.overnight && nightFee(state.sec) > 0;
+function renderNight(){
+  const fee = nightFee(state.sec), out = nightCfg().out || "";
+  document.querySelectorAll(".night-slot").forEach(el=>{
+    if(!fee){ el.innerHTML = ""; return; }
+    el.innerHTML = `<button type="button" class="night" data-night aria-pressed="${nightOn()}"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span><span class="nt"><b>مع مبيت${out?` حتى ${esc(out)}`:""}</b><small>${nightOn()?"مضاف للحجز · اضغط للإلغاء":"اضغط لإضافة المبيت"}</small></span><span class="nf">+ ${money(fee)}</span><span class="sw" aria-hidden="true"></span></button>`;
+  });
+}
+document.addEventListener("click", e=>{ if(!e.target.closest("[data-night]")) return;
+  state.overnight = !state.overnight; renderNight();
+  if(state.step===1) renderStep1(); if(state.step===2){ renderCal(); renderSel(); } if(state.step===4) renderCart(); });
 function pkgPrice(p, k){ const v = basePrice(p,k); if(v==null) return null;
-  const se = seasonFor(k); return se ? Math.round(v * (1 + Number(se.pct||0)/100)) : v; }
-function pkgTimes(p){ let h=""; if(p.in) h+=fact("وقت الدخول", esc(p.in)); if(p.out) h+=fact("وقت الخروج", esc(p.out)); return h; }
+  const se = seasonFor(k); const b = se ? Math.round(v * (1 + Number(se.pct||0)/100)) : v;
+  return b + (nightOn() && p.sec===state.sec ? nightFee(state.sec) : 0); }
+function pkgOut(p){ return nightOn() && p.sec===state.sec && nightCfg().out ? nightCfg().out : p.out; }
+function pkgTimes(p){ let h=""; const o = pkgOut(p); if(p.in) h+=fact("وقت الدخول", esc(p.in)); if(o) h+=fact("وقت الخروج", esc(o)+(nightOn() && p.sec===state.sec?"<small style=\"color:var(--muted)\">مع المبيت</small>":"")); return h; }
 const depositAmt = ()=> Number(state.settings.deposit)||0;
 
 function goStep(n){
   [1,2,3,4,5,6].forEach(i=>$("step"+i).hidden = i!==n); sheetBox.scrollTop = 0; state.step = n;
   document.querySelectorAll(".stepno").forEach(el=>el.textContent = n<=STEPS_TOTAL ? `${fmtN(n)} من ${fmtN(STEPS_TOTAL)}` : "");
-  if(n===2){ renderCal(); renderSel(); renderSummary(); renderWait(); }
+  if(n===2){ renderNight(); renderCal(); renderSel(); renderSummary(); renderWait(); }
   if(n===3) renderVerify();
   if(n===4) renderCart();
   if(n===5) renderInfo();
@@ -1185,9 +1216,10 @@ function renderStep1(){
   $("moreSpecs").onclick = ()=>{ showAllSpecs = !showAllSpecs; renderStep1(); };
   const pk = packagesFor(state.sec), cur = curPkg(); state.pkg = cur.id;
   $("shOpts").innerHTML = pk.map(p=>`<button class="opt" type="button" data-pkg="${esc(p.id)}" aria-pressed="${p.id===cur.id}">${esc(p.name)}</button>`).join("");
-  const prices = (Array.isArray(cur.days)?cur.days:[cur.wd,cur.we]).filter(x=>x!==null && x!=="" && Number(x)>0).map(Number);
+  const prices = (Array.isArray(cur.days)?cur.days:[cur.wd,cur.we]).filter(x=>x!==null && x!=="" && Number(x)>0).map(x=>Number(x) + (nightOn() ? nightFee(state.sec) : 0));
   const priceTxt = !prices.length ? "يُحدَّد عند التواصل" : (Math.min(...prices)!==Math.max(...prices) ? `من ${money(Math.min(...prices))} إلى ${money(Math.max(...prices))}` : money(prices[0]));
-  $("shFacts").innerHTML = fact("السعر", priceTxt) + dayPricesHtml(cur) + secFact() + (depositAmt() ? fact("العربون", money(depositAmt())+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>") + fact("المتبقي", "يُدفع عند الوصول للمزرعة") : "") + pkgTimes(cur);
+  renderNight();
+  $("shFacts").innerHTML = fact(nightOn() ? "السعر مع المبيت" : "السعر", priceTxt) + dayPricesHtml(cur) + secFact() + (depositAmt() ? fact("العربون", money(depositAmt())+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>") + fact("المتبقي", "يُدفع عند الوصول للمزرعة") : "") + pkgTimes(cur);
 }
 $("shOpts").addEventListener("click", e=>{ const b=e.target.closest("[data-pkg]"); if(!b) return; state.pkg = b.dataset.pkg; renderStep1(); });
 
@@ -1209,7 +1241,7 @@ $("shDots").addEventListener("click", e=>{ const d=e.target.closest("button"); i
   $("shTrack").scrollTo({left:-i*$("shTrack").clientWidth, behavior:"smooth"}); });
 
 function openSheet(sec){
-  state.sec = sec; state.sel = null; state.pkg = null; state.coupon = null; state.extras = new Set(); state.waitDate = null; showAllSpecs = false; lastFocus = document.activeElement; $("agree").checked = false;
+  state.sec = sec; state.sel = null; state.pkg = null; state.coupon = null; state.extras = new Set(); state.waitDate = null; state.overnight = false; showAllSpecs = false; lastFocus = document.activeElement; $("agree").checked = false;
   $("formMsg").hidden = true; $("couponMsg").hidden = true; $("cCode").value = "";
   buildSheetSlider(); renderStep1();
   $("sheet").hidden = false; document.body.style.overflow="hidden"; heroVids.forEach(v=>v.pause());
@@ -1292,7 +1324,7 @@ function renderCart(){
 }
 function renderPay(){
   const t = totals();
-  $("payFacts").innerHTML = (t.price ? fact("سعر الباقة", money(t.price)) : fact("سعر الباقة", "يُحدَّد عند التواصل")) +
+  $("payFacts").innerHTML = (t.price ? fact(nightOn() ? "سعر الباقة مع المبيت" : "سعر الباقة", money(t.price)) : fact("سعر الباقة", "يُحدَّد عند التواصل")) +
     t.ex.map(x=>fact(esc(x.name), money(x.price||0))).join("") +
     t.discs.map(d=>fact(esc(d.label), "− "+money(d.amt), "good")).join("") +
     (t.price || t.exT ? fact("الإجمالي", money(t.total)) : "") +
@@ -1390,7 +1422,7 @@ $("form").addEventListener("submit", async e=>{
   if(phone2 && phone2.replace(/\D/g,"").length < 9) return show($("formMsg"),"الرقم الإضافي غير صحيح. صححه أو اتركه فارغًا.",true);
   const p = curPkg(), t = totals();
   const r = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), section: state.sec, date: state.sel,
-    pkgId: p.id, pkgName: p.name, in: p.in||"", out: p.out||"",
+    pkgId: p.id, pkgName: p.name + (nightOn() ? " + مبيت" : ""), in: p.in||"", out: pkgOut(p)||"", overnight: nightOn(), overnightFee: nightOn() ? nightFee(state.sec) : 0,
     name, phone, phone2, guests: Number($("fGuests").value)||1, type: $("fType").value, note: $("fNote").value.trim(),
     price: t.price||null, extras: t.ex.map(x=>({name:x.name, price:Number(x.price)||0})), extrasTotal: t.exT, optIn: $("optIn").checked,
     coupon: state.coupon?.code||"", couponGift: !!(state.coupon && state.coupon.amount), discounts: t.discs, discount: t.disc, total: t.total||null, deposit: t.dep||0,
@@ -2005,7 +2037,7 @@ function dayPricesHtml(p){
   if(!Array.isArray(p.days)) return "";
   const groups = []; p.days.forEach((v,i)=>{ const val = (v===null||v===""||v===undefined) ? null : Number(v); const g = groups[groups.length-1];
     if(g && g.val===val) g.to=i; else groups.push({from:i,to:i,val}); });
-  return groups.map(g=>fact(g.from===g.to ? DAYN[g.from] : `${DAYN[g.from]} – ${DAYN[g.to]}`, g.val==null ? "غير متاح" : money(g.val))).join("");
+  return groups.map(g=>fact(g.from===g.to ? DAYN[g.from] : `${DAYN[g.from]} – ${DAYN[g.to]}`, g.val==null ? "غير متاح" : money(g.val + (nightOn() && p.sec===state.sec ? nightFee(state.sec) : 0)))).join("");
 }
 
 /* ---------- home: quick availability ---------- */
@@ -2085,11 +2117,11 @@ async function setBlocked(c, block){
 /* ---------- offers & loyalty settings ---------- */
 function renderOffersAdmin(){
   const st = state.settings, lv = st.loyalty||{};
-  [["oMid", st.midweekPct], ["oEvery", lv.every], ["oLoy", lv.pct], ["oSec", st.security]].forEach(([id,v])=>{ if(document.activeElement!==$(id)) $(id).value = v || ""; });
+  [["oMid", st.midweekPct], ["oEvery", lv.every], ["oLoy", lv.pct], ["oSec", st.security], ["oN1", (st.overnight||{}).s1], ["oN2", (st.overnight||{}).both], ["oNOut", (st.overnight||{}).out]].forEach(([id,v])=>{ if(document.activeElement!==$(id)) $(id).value = v || ""; });
 }
 $("offForm").addEventListener("submit", e=>{ e.preventDefault();
   act(e.submitter||$("offForm").querySelector("button"), async ()=>{
-    await state.db.doc("settings/main").set({...state.settings, midweekPct:Number($("oMid").value)||0, loyalty:{every:Number($("oEvery").value)||0, pct:Number($("oLoy").value)||0}, security:Number($("oSec").value)||0});
+    await state.db.doc("settings/main").set({...state.settings, midweekPct:Number($("oMid").value)||0, loyalty:{every:Number($("oEvery").value)||0, pct:Number($("oLoy").value)||0}, security:Number($("oSec").value)||0, overnight:{s1:Number($("oN1").value)||0, s2:Number($("oN1").value)||0, both:Number($("oN2").value)||0, out:$("oNOut").value.trim()}});
     show($("offMsg"),"حُفظت العروض."); }); });
 
 /* ---------- FAQ, rules, license editor ---------- */
