@@ -558,7 +558,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
       <a href="https://www.instagram.com/muhammadiyah_farm" target="_blank" rel="noopener" aria-label="إنستقرام"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg></a>
       <a href="https://www.tiktok.com/@muhammadiyah_farm" target="_blank" rel="noopener" aria-label="تيك توك"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5M14 3c.5 2.5 2.5 4.5 5 4.5"/></svg></a>
     </div>
-    <nav class="fnav" aria-label="روابط"><a href="#home">الرئيسية</a><a href="#sections">الأقسام</a><a href="#account">حجوزاتي</a></nav>
+    <nav class="fnav" aria-label="روابط"><a href="#home">الرئيسية</a><a href="#sections">الأقسام</a><a href="#account">حجوزاتي</a><a href="/privacy">سياسة الخصوصية</a></nav>
     <div class="contact" id="contactList"><p class="copy">بيانات التواصل تظهر هنا بعد إضافتها من لوحة المالك.</p></div>
     <p class="copy" id="license" hidden></p>
     <p class="copy">© مزرعة المحمدية</p>
@@ -1015,7 +1015,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
           <p class="muted">يرجى ملء المعلومات المطلوبة أدناه.</p>
           <label for="fName"><span>الاسم الكامل <span class="req">*</span></span><input id="fName" required autocomplete="name"></label>
           <div class="row2">
-            <label for="fPhone"><span>رقم الجوال <span class="req">*</span></span><input id="fPhone" required inputmode="tel" dir="ltr" readonly></label>
+            <label for="fPhone"><span>رقم الجوال <span class="req">*</span></span><input id="fPhone" required inputmode="tel" autocomplete="tel" placeholder="05xxxxxxxx" dir="ltr"></label>
             <label for="fPhone2">رقم إضافي (اختياري)<input id="fPhone2" inputmode="tel" placeholder="05xxxxxxxx" dir="ltr"></label>
           </div>
           <div class="row2">
@@ -1024,6 +1024,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
           </div>
           <label for="fNote">ملاحظات<textarea id="fNote" placeholder="وقت الوصول، طلبات إضافية…"></textarea></label>
           <label class="check"><input type="checkbox" id="optIn" checked><span>أرغب باستلام العروض والخصومات عبر واتساب</span></label>
+          <p class="note">بإرسال الطلب توافق على <a href="/privacy" target="_blank" rel="noopener">سياسة الخصوصية</a>.</p>
           <div id="formMsg" hidden></div>
           <div class="sticky-cta"><div class="due-row"><span>المطلوب الآن</span><b id="dueNow"></b></div><button class="btn block-btn" id="submit" type="submit">متابعة إلى الدفع</button></div>
         </form>
@@ -1155,7 +1156,8 @@ let lastFocus=null, showAllSpecs=false;
 const sheetBox = $("sheetBox");
 const money = n => fmtN(Math.round(n))+" ريال";
 function fact(label, value, cls){ return `<div class="fact${cls?" "+cls:""}"><span>${label}</span><b>${value}</b></div>`; }
-const STEPS_TOTAL = 5;
+const otpOn = ()=> !!state.settings.otpEnabled;   // turned on once a real SMS provider is connected
+const activeSteps = ()=> otpOn() ? [1,2,3,4,5] : [1,2,4,5];
 
 /* packages */
 function packagesFor(sec){
@@ -1193,14 +1195,15 @@ const depositAmt = ()=> Number(state.settings.deposit)||0;
 
 function goStep(n){
   [1,2,3,4,5,6].forEach(i=>$("step"+i).hidden = i!==n); sheetBox.scrollTop = 0; state.step = n;
-  document.querySelectorAll(".stepno").forEach(el=>el.textContent = n<=STEPS_TOTAL ? `${fmtN(n)} من ${fmtN(STEPS_TOTAL)}` : "");
+  const st = activeSteps(), pos = st.indexOf(n);
+  document.querySelectorAll(".stepno").forEach(el=>el.textContent = pos>=0 ? `${fmtN(pos+1)} من ${fmtN(st.length)}` : "");
   if(n===2){ renderNight(); renderCal(); renderSel(); renderSummary(); renderWait(); }
   if(n===3) renderVerify();
   if(n===4) renderCart();
   if(n===5) renderInfo();
 }
 function goBack(){
-  let n = state.step-1; if(n===3 && state.verified) n = 2; goStep(Math.max(1,n));
+  let n = state.step-1; if(n===3 && (state.verified || !otpOn())) n = 2; goStep(Math.max(1,n));
 }
 
 function renderStep1(){
@@ -1253,7 +1256,7 @@ $("sheet").addEventListener("click", e=>{
   if(e.target.closest("[data-back]")) goBack();
 });
 $("toStep2").onclick = ()=>goStep(2);
-$("toStep3").onclick = ()=>{ if(state.sel && !takenFor(state.sec,state.sel)) goStep(state.verified ? 4 : 3); };
+$("toStep3").onclick = ()=>{ if(state.sel && !takenFor(state.sec,state.sel)) goStep(state.verified || !otpOn() ? 4 : 3); };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ closeLb(); if(!$("sheet").hidden) closeSheet(); } });
 
 function selFactsHtml(k){
@@ -1319,7 +1322,7 @@ function renderCart(){
   const cv = mediaFor(state.sec).imgs[0]; if(cv){ $("cartImg").src = cv.url; $("cartImg").hidden = false; } else $("cartImg").hidden = true;
   $("cartName").textContent = s.name; $("cartPkg").textContent = p.name;
   const se = seasonFor(state.sel);
-  $("cartFacts").innerHTML = fact("التاريخ", niceDate(state.sel)) + (se ? fact("الموسم", esc(se.name)) : "") + pkgTimes(p) + fact("الجوال", `<span dir="ltr">${esc(state.verified||"")}</span>`);
+  $("cartFacts").innerHTML = fact("التاريخ", niceDate(state.sel)) + (se ? fact("الموسم", esc(se.name)) : "") + pkgTimes(p) + (state.verified ? fact("الجوال", `<span dir="ltr">${esc(state.verified)}</span>`) : "");
   renderExtras(); renderPay();
 }
 function renderPay(){
@@ -1348,7 +1351,7 @@ $("couponForm").addEventListener("submit", async e=>{
 $("toStep5").onclick = ()=>{ if(!$("policyBox").hidden && !$("agree").checked) return show($("agreeMsg"),"يلزم الموافقة على سياسة الحجز والإلغاء للمتابعة.",true); $("agreeMsg").hidden = true; goStep(5); };
 
 /* step 5: customer info */
-function renderInfo(){ $("fPhone").value = state.verified || ""; const t = totals(); $("dueNow").textContent = t.due ? money(t.due) : "يُحدَّد عند التواصل"; }
+function renderInfo(){ const ph = $("fPhone"); ph.readOnly = otpOn(); if(otpOn() || !ph.value) ph.value = state.verified || ""; const t = totals(); $("dueNow").textContent = t.due ? money(t.due) : "يُحدَّد عند التواصل"; }
 
 
 function renderCal(){
@@ -1417,7 +1420,9 @@ $("form").addEventListener("submit", async e=>{
   e.preventDefault();
   const name = $("fName").value.trim(), phone = $("fPhone").value.trim(), phone2 = $("fPhone2").value.trim();
   if(!state.sel) return goStep(2);
-  if(!state.verified) return goStep(3);
+  if(otpOn() && !state.verified) return goStep(3);
+  if(!/^5\d{8}$/.test(normPhone(phone))) return show($("formMsg"),"اكتب رقم جوال سعودي صحيح، مثل 05xxxxxxxx.",true);
+  if(await isBlocked(normPhone(phone))) return show($("formMsg"),"تعذّر إتمام الحجز بهذا الرقم. تواصل معنا عبر واتساب.",true);
   if(name.split(/\s+/).length < 2) return show($("formMsg"),"اكتب الاسم الكامل (الاسم الأول واسم العائلة على الأقل).",true);
   if(phone2 && phone2.replace(/\D/g,"").length < 9) return show($("formMsg"),"الرقم الإضافي غير صحيح. صححه أو اتركه فارغًا.",true);
   const p = curPkg(), t = totals();
