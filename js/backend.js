@@ -115,7 +115,7 @@
 
   async function call(fn, body){
     const { data, error } = await sb.functions.invoke(fn, { body });
-    if(error){ let detail = null; try{ detail = await error.context?.json?.(); }catch{} return detail || { ok:false, error:"network" }; }
+    if(error){ let detail = null; try{ detail = await error.context?.json?.(); }catch{} return detail || { ok:false, error:"network", message: (error.context?.status ? "HTTP " + error.context.status + " " : "") + (error.message || "") }; }
     return data;
   }
 

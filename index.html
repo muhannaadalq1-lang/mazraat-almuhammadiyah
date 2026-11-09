@@ -1302,16 +1302,17 @@ function otpCooldown(sec){
   tick(); otpTimer = setInterval(tick, 1000);
 }
 const OTP_ERR = { wait:"انتظر قليلًا قبل طلب رمز جديد.", too_many:"طلبت رموزًا كثيرة. حاول بعد ساعة أو تواصل معنا عبر واتساب.", send_failed:"تعذّر إرسال الرمز. تأكد من الرقم وحاول مرة ثانية.", bad_phone:"رقم الجوال غير صحيح.", not_configured:"خدمة التحقق غير مفعّلة حاليًا. تواصل معنا عبر واتساب.", network:"تعذّر الاتصال. تأكد من الإنترنت وحاول مرة ثانية." };
+const otpWhy = r => r ? ` (${[r.error, r.message].filter(Boolean).join(": ")})` : "";
 async function sendOtp(d, channel, msgBox, btn){
   if(btn) btn.disabled = true;
   try{
     const otp = await window.claude.use("otp"); let r = await otp.send(d, channel);
     if(channel === "whatsapp" && r && r.error === "send_failed") r = await otp.send(d, "sms");   // WhatsApp not ready → SMS
-    if(!r || !r.ok){ if(r && r.wait) otpCooldown(r.wait); return show(msgBox, OTP_ERR[r && r.error] || OTP_ERR.network, true), false; }
+    if(!r || !r.ok){ if(r && r.wait) otpCooldown(r.wait); return show(msgBox, (OTP_ERR[r && r.error] || OTP_ERR.network) + otpWhy(r), true), false; }
     $("otpTo").textContent = "+966 "+d;
     $("otpLead").firstChild.textContent = r.channel === "sms" ? "أرسلنا رمز التحقق برسالة نصية إلى " : "أرسلنا رمز التحقق على واتساب إلى ";
     otpCooldown(60); return true;
-  }catch{ show(msgBox, OTP_ERR.network, true); return false; }
+  }catch(err){ show(msgBox, "تعذّر بدء الجلسة. حدّث الصفحة وحاول مرة ثانية." + otpWhy({ error: err?.message || err, message: window.__captchaIssue }), true); return false; }
   finally{ if(btn) btn.disabled = false; }
 }
 $("phoneForm").addEventListener("submit", async e=>{
@@ -1339,7 +1340,7 @@ $("otpForm").addEventListener("submit", async e=>{
   otpBusy = true;
   try{
     const otp = await window.claude.use("otp"); const r = await otp.verify(normPhone(state.pendingPhone), code);
-    if(!r || !r.ok) return show($("otpMsg"), r && r.error==="wrong_code" ? "الرمز غير صحيح أو انتهت صلاحيته. تأكد منه أو اطلب رمزًا جديدًا." : (OTP_ERR[r && r.error] || OTP_ERR.network), true);
+    if(!r || !r.ok) return show($("otpMsg"), r && r.error==="wrong_code" ? "الرمز غير صحيح أو انتهت صلاحيته. تأكد منه أو اطلب رمزًا جديدًا." : (OTP_ERR[r && r.error] || OTP_ERR.network) + otpWhy(r), true);
     state.verified = state.pendingPhone; try{ sessionStorage.setItem("vPhone", state.verified); }catch{}
     goStep(4);
   }catch{ show($("otpMsg"), OTP_ERR.network, true); }
