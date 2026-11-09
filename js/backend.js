@@ -8,6 +8,8 @@
   const TURNSTILE_SITE_KEY = "0x4AAAAAAF6H2ktIAJSFsugu";
   // Moyasar publishable key (public). pk_test_ = test payments; switch to pk_live_ when the account is activated.
   window.MOYASAR_PK = "pk_test_6E9pjwmDp2FGEFdCwCxDGZmEKMKp3GmJnA7LCRkB";
+  // Turn on after the domain is verified in Moyasar (Settings → Apple Pay).
+  window.APPLE_PAY = false;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   window.sb = sb;
 

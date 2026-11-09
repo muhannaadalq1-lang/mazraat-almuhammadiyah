@@ -2304,7 +2304,8 @@ function payView(r, kind, amount){
       element: ".mysr-form", amount: Math.round(amount*100), currency: "SAR", language: "ar",
       description: `مزرعة المحمدية · ${s.name.split(" · ")[0]} · ${r.date} · ${label}`,
       publishable_api_key: window.MOYASAR_PK, callback_url: back,
-      methods: ["creditcard"], supported_networks: ["mada","visa","mastercard"],
+      methods: window.APPLE_PAY && window.ApplePaySession ? ["applepay","creditcard"] : ["creditcard"], supported_networks: ["mada","visa","mastercard"],
+      apple_pay: { country: "SA", label: "Muhammadiyah Farm", validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate" },
       metadata: { uid: state.uid, reqId: r.id, kind }
     });
   }).catch(()=> show($("payMsg"), "تعذّر تحميل نموذج الدفع. تأكد من الاتصال وحاول مرة ثانية.", true));
