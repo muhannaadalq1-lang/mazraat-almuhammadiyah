@@ -6,6 +6,8 @@
   const SUPABASE_KEY = "sb_publishable_7wQLtrvohnaveuIU7Y-CKg_wFArC4aX"; // publishable key: safe in the browser, access is enforced by row-level security
   // Cloudflare Turnstile site key (public). Leave empty to run without the bot check.
   const TURNSTILE_SITE_KEY = "0x4AAAAAAF6H2ktIAJSFsugu";
+  // Moyasar publishable key (public). pk_test_ = test payments; switch to pk_live_ when the account is activated.
+  window.MOYASAR_PK = "pk_test_6E9pjwmDp2FGEFdCwCxDGZmEKMKp3GmJnA7LCRkB";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   window.sb = sb;
 
@@ -110,6 +112,13 @@
   }
 
   const caps = {
+    pay: {
+      async verify(id){
+        const { data, error } = await sb.functions.invoke("verify-payment", { body: { id } });
+        if(error){ let detail = null; try{ detail = await error.context?.json?.(); }catch{} throw Object.assign(new Error(error.message), { detail }); }
+        return data;
+      }
+    },
     db: { doc, collection },
     user: {
       async id(){ const s = await session(); return s ? s.user.id : null; },

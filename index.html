@@ -238,6 +238,19 @@ textarea{min-height:70px;resize:vertical}
 button.spec{cursor:pointer;justify-content:center;color:var(--muted);font:inherit}
 .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
 .opt{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface);cursor:pointer;text-align:center}
+.pay-opt{align-items:flex-start}
+.pay-opt span{display:grid;line-height:1.5}
+.pay-opt small{color:var(--muted);font-size:12px}
+#payChoice:not([hidden]){display:grid;gap:8px}
+.pay-result{display:grid;gap:4px;border-radius:14px;padding:14px 16px;font-size:14px}
+.pay-result[hidden]{display:none}
+.pay-result.wait{background:var(--surface-2)}
+.pay-result.good{background:rgba(76,197,140,.18)}
+.pay-result.bad{background:var(--booked);color:var(--booked-ink)}
+.mysr-form{width:100%}
+.pay-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.flag{font-size:12px;border-radius:999px;padding:1px 10px;background:var(--booked);color:var(--booked-ink)}
+.flag.ok{background:rgba(76,197,140,.2);color:var(--teal-ink)}
 .night{display:flex;align-items:center;gap:12px;width:100%;border:1.5px dashed var(--line);border-radius:14px;padding:12px 14px;background:var(--surface);cursor:pointer;text-align:right;color:var(--fg);font:inherit}
 .night .mi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);color:#5b5fb0;flex:none}
 .night .mi svg{width:22px;height:22px}
@@ -541,6 +554,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
 
   <section class="block in" id="account" aria-label="حجوزاتي">
     <h2>حجوزاتي</h2>
+    <div class="pay-result" id="payResult" hidden></div>
     <div class="list" id="mine"><p class="note">لا توجد طلبات حجز بعد. اختر قسمًا من <a href="#sections">الأقسام</a> واضغط «احجز الآن».</p></div>
   </section>
 
@@ -1001,7 +1015,8 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
         <div id="cartExtrasBox" hidden><strong>خدمات إضافية</strong><div class="extras" id="cartExtras"></div></div>
         <strong>تفاصيل الدفع</strong>
         <div class="facts" id="payFacts"></div>
-        <div class="pay-note" id="depNote" hidden><span>• العربون <b id="depNoteAmt"></b> يثبّت الحجز، و<b>غير مسترد</b> إذا أُلغي الحجز قبل الموعد بأقل من ٤٨ ساعة.</span><span>• المبلغ المتبقي <b id="depNoteRest"></b> يُدفع عند وصولك للمزرعة.</span></div>
+        <div id="payChoice" hidden></div>
+        <div class="pay-note" id="depNote" hidden><span>• العربون <b id="depNoteAmt"></b> يثبّت الحجز، و<b>غير مسترد</b> إذا أُلغي الحجز قبل الموعد بأقل من ٤٨ ساعة.</span><span>• المبلغ المتبقي <b id="depNoteRest"></b> تدفعه من «حجوزاتي» قبل موعدك أو عند وصولك للمزرعة.</span></div>
         <div id="policyBox" hidden><strong>سياسة الحجز والإلغاء</strong><p class="policy-text" id="policyText"></p><label class="check"><input type="checkbox" id="agree"><span>قرأت سياسة الحجز والإلغاء وأوافق عليها</span></label><div id="agreeMsg" hidden></div></div>
         <div class="sticky-cta"><button class="btn block-btn" type="button" id="toStep5">متابعة</button></div>
       </div>
@@ -1033,9 +1048,15 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
 
     <!-- 6: payment / result -->
     <div id="step6" hidden>
-      <div class="sheet-top"><h3>الدفع</h3><button class="icon-btn" type="button" data-close aria-label="إغلاق"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="sheet-top"><h3 id="payTitle">الدفع</h3><button class="icon-btn" type="button" data-close aria-label="إغلاق"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <div class="sheet-body">
-        <div class="done">
+        <div id="payStage" hidden style="display:grid;gap:14px">
+          <div class="facts" id="paySummary"></div>
+          <div id="mysrBox"></div>
+          <div id="payMsg" hidden></div>
+          <p class="note">الدفع آمن عبر بوابة «ميسّر». بيانات بطاقتك لا تصل للمزرعة.</p>
+        </div>
+        <div class="done" id="doneStage">
           <div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
           <h3 id="doneTitle">تم تسجيل حجزك مبدئيًا</h3>
           <p class="muted" id="doneText"></p>
@@ -1244,7 +1265,7 @@ $("shDots").addEventListener("click", e=>{ const d=e.target.closest("button"); i
   $("shTrack").scrollTo({left:-i*$("shTrack").clientWidth, behavior:"smooth"}); });
 
 function openSheet(sec){
-  state.sec = sec; state.sel = null; state.pkg = null; state.coupon = null; state.extras = new Set(); state.waitDate = null; state.overnight = false; showAllSpecs = false; lastFocus = document.activeElement; $("agree").checked = false;
+  state.sec = sec; state.sel = null; state.pkg = null; state.coupon = null; state.extras = new Set(); state.waitDate = null; state.overnight = false; state.payKind = "deposit"; $("payStage").hidden = true; $("doneStage").hidden = false; showAllSpecs = false; lastFocus = document.activeElement; $("agree").checked = false;
   $("formMsg").hidden = true; $("couponMsg").hidden = true; $("cCode").value = "";
   buildSheetSlider(); renderStep1();
   $("sheet").hidden = false; document.body.style.overflow="hidden"; heroVids.forEach(v=>v.pause());
@@ -1331,9 +1352,10 @@ function renderPay(){
     t.ex.map(x=>fact(esc(x.name), money(x.price||0))).join("") +
     t.discs.map(d=>fact(esc(d.label), "− "+money(d.amt), "good")).join("") +
     (t.price || t.exT ? fact("الإجمالي", money(t.total)) : "") +
-    (t.dep ? fact("العربون المطلوب الآن", money(t.dep)+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>", "strong") + fact("المتبقي يُدفع عند الوصول", t.total ? money(t.rest) : "حسب السعر النهائي") : (t.total ? fact("المطلوب الآن", money(t.total), "strong") : ""));
+    (t.dep ? fact("العربون المطلوب الآن", money(t.dep)+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>", "strong") + fact(payOn() ? "المتبقي (قبل الموعد أو عند الوصول)" : "المتبقي يُدفع عند الوصول", t.total ? money(t.rest) : "حسب السعر النهائي") : (t.total ? fact("المطلوب الآن", money(t.total), "strong") : ""));
   $("payFacts").insertAdjacentHTML("beforeend", secFact());
-  $("depNote").hidden = !t.dep; $("depNoteAmt").textContent = money(t.dep); $("depNoteRest").textContent = t.total ? "("+money(t.rest)+")" : "";
+  renderPayChoice();
+  $("depNote").hidden = !t.dep || (payOn() && state.payKind==="full"); $("depNoteAmt").textContent = money(t.dep); $("depNoteRest").textContent = t.total ? "("+money(t.rest)+")" : "";
 }
 $("couponForm").addEventListener("submit", async e=>{
   e.preventDefault();
@@ -1351,7 +1373,7 @@ $("couponForm").addEventListener("submit", async e=>{
 $("toStep5").onclick = ()=>{ if(!$("policyBox").hidden && !$("agree").checked) return show($("agreeMsg"),"يلزم الموافقة على سياسة الحجز والإلغاء للمتابعة.",true); $("agreeMsg").hidden = true; goStep(5); };
 
 /* step 5: customer info */
-function renderInfo(){ const ph = $("fPhone"); ph.readOnly = otpOn(); if(otpOn() || !ph.value) ph.value = state.verified || ""; const t = totals(); $("dueNow").textContent = t.due ? money(t.due) : "يُحدَّد عند التواصل"; }
+function renderInfo(){ const ph = $("fPhone"); ph.readOnly = otpOn(); if(otpOn() || !ph.value) ph.value = state.verified || ""; const t = totals(), due = dueFor(t); $("dueNow").textContent = due ? money(due) : "يُحدَّد عند التواصل"; $("submit").textContent = payOn() && due ? "متابعة إلى الدفع" : "أرسل طلب الحجز"; }
 
 
 function renderCal(){
@@ -1402,7 +1424,8 @@ function showDone(r, saved){
   $("doneText").textContent = saved
     ? `شكرًا ${r.name.split(" ")[0]}. حجزنا لك اليوم مؤقتًا لمدة ${fmtN(Number(state.settings.holdHours)||24)} ساعة، وسنتواصل معك على ${r.phone} لتأكيده${r.deposit?" واستلام العربون":""}. تجد الطلب في «حجوزاتي».`
     : "الحجز المباشر غير متاح لك في هذه النسخة. أرسل تفاصيل الطلب للمزرعة عبر واتساب لتأكيده.";
-  $("payNote").hidden = !saved;
+  $("payStage").hidden = true; $("doneStage").hidden = false; $("payTitle").textContent = "طلب الحجز";
+  $("payNote").hidden = !saved || payOn();
   $("doneFacts").innerHTML = fact("القسم", SECTIONS[r.section].name) + fact("الباقة", esc(r.pkgName)) + fact("التاريخ", niceDate(r.date)) +
     (r.in?fact("وقت الدخول", esc(r.in)):"") + (r.out?fact("وقت الخروج", esc(r.out)):"") +
     (r.total?fact("الإجمالي", money(r.total)):"") + (r.deposit?fact("العربون المطلوب", money(r.deposit)+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>", "strong"):"") + (r.deposit && r.total ? fact("المتبقي عند الوصول", money(Math.max(0, r.total-r.deposit))) : "") + fact("الاسم", esc(r.name));
@@ -1431,7 +1454,7 @@ $("form").addEventListener("submit", async e=>{
     name, phone, phone2, guests: Number($("fGuests").value)||1, type: $("fType").value, note: $("fNote").value.trim(),
     price: t.price||null, extras: t.ex.map(x=>({name:x.name, price:Number(x.price)||0})), extrasTotal: t.exT, optIn: $("optIn").checked,
     coupon: state.coupon?.code||"", couponGift: !!(state.coupon && state.coupon.amount), discounts: t.discs, discount: t.disc, total: t.total||null, deposit: t.dep||0,
-    paid: false, status:"pending", createdAt: Date.now() };
+    paid: false, paidAmount: 0, payChoice: payOn() ? state.payKind : "", status:"pending", createdAt: Date.now() };
   $("formMsg").hidden = true;
   if(takenFor(state.sec, state.sel)){ show($("formMsg"),"عذرًا، حُجز هذا اليوم قبل لحظات. اختر يومًا آخر.",true); return; }
   if(state.db && !state.uid){ try{ await ensureUid(); }catch{} }
@@ -1445,7 +1468,11 @@ $("form").addEventListener("submit", async e=>{
       await state.db.doc("holds/"+state.uid).set({uid: state.uid, items:[...myHolds, {date:r.date, sec:r.section, reqId:r.id, at:Date.now()}]});
     }catch{}
     state.mine = items; renderMine();
-    $("fNote").value = ""; showDone(r, true); state.sel = null;
+    $("fNote").value = "";
+    const due = dueFor(t);
+    if(payOn() && due > 0){ payView(r, state.payKind==="full" ? "full" : "deposit", due); }
+    else showDone(r, true);
+    state.sel = null;
   }catch{ showDone(r, false); }
   finally{ $("submit").disabled = false; }
 });
@@ -1460,7 +1487,12 @@ function renderMine(){
       : `<button class="btn ghost sm" type="button" data-rate="${r.id}">قيّم زيارتك</button>
          <form class="rate-form" id="rf-${r.id}" data-req="${r.id}" data-stars="5" hidden><div class="star-pick">${[1,2,3,4,5].map(n=>`<button type="button" class="on" data-star="${n}" aria-label="${n} نجوم">★</button>`).join("")}</div>
          <textarea placeholder="اكتب رأيك في زيارتك" aria-label="رأيك"></textarea><button class="btn sm" type="submit">أرسل التقييم</button></form>`;
-    return `<div class="item"><div class="item-top"><strong>${SECTIONS[r.section].name} · ${niceDate(r.date)}</strong><span class="pill ${r.status}">${STATUS[r.status]}</span></div><span class="note">${esc(r.pkgName||"يوم كامل")}${r.guests?" · "+fmtN(r.guests)+" أشخاص":""}${r.total?" · "+money(r.total):""}</span>${r.status!=="rejected" && r.total ? `<span class="rest-line">${r.status==="confirmed" ? `المدفوع <b>${money(r.paidAmount||0)}</b>` : `العربون المطلوب <b>${money(r.deposit||0)}</b>`} · المتبقي عند الوصول <b>${money(Math.max(0, r.total-(r.status==="confirmed" ? (r.paidAmount||0) : (r.deposit||0))))}</b></span>` : ""}${rate}</div>`;
+    const restAmt = Math.max(0, (r.total||0) - (r.paidAmount||0));
+    const canPay = payOn() && r.status!=="rejected" && r.total && restAmt > 0 && parseKey(r.date) >= today;
+    const payBtns = !canPay ? "" : (r.paidAmount||0) > 0
+      ? `<div class="pay-btns"><button class="btn sm" type="button" data-pay="${r.id}|rest">ادفع المتبقي ${money(restAmt)}</button></div>`
+      : `<div class="pay-btns">${r.deposit && r.deposit < restAmt ? `<button class="btn sm" type="button" data-pay="${r.id}|deposit">ادفع العربون ${money(r.deposit)}</button>` : ""}<button class="btn ghost sm" type="button" data-pay="${r.id}|full">ادفع كامل المبلغ ${money(restAmt)}</button></div>`;
+    return `<div class="item"><div class="item-top"><strong>${SECTIONS[r.section].name} · ${niceDate(r.date)}</strong><span class="pill ${r.status}">${(r.paidAmount||0) >= (r.total||1) && r.status==="confirmed" ? "مدفوع بالكامل" : STATUS[r.status]}</span></div><span class="note">${esc(r.pkgName||"يوم كامل")}${r.guests?" · "+fmtN(r.guests)+" أشخاص":""}${r.total?" · "+money(r.total):""}</span>${r.status!=="rejected" && r.total ? `<span class="rest-line">${r.status==="confirmed" ? `المدفوع <b>${money(r.paidAmount||0)}</b>` : `العربون المطلوب <b>${money(r.deposit||0)}</b>`} · المتبقي <b>${money(Math.max(0, r.total-(r.status==="confirmed" ? (r.paidAmount||0) : (r.deposit||0))))}</b></span>` : ""}${payBtns}${rate}</div>`;
   }).join("");
 }
 function renderReviews(){
@@ -1715,6 +1747,7 @@ function renderRequests(){
     const rest = Math.max(0,(r.total||0)-(r.paidAmount||0));
     it.innerHTML = `<div class="item-top"><strong>${SECTIONS[r.section].name.split(" · ")[0]} · ${niceDate(r.date)}</strong>${payPill(r)}</div>
       <span class="note">${esc(r.name)} · <span dir="ltr">${esc(r.phone)}</span>${r.phone2?` · <span dir="ltr">${esc(r.phone2)}</span>`:""}${r.manual?" · حجز يدوي":""}</span>
+      ${r.paidOnline ? `<span class="flag ok">دُفع إلكترونيًا ${money(r.paidAmount||0)}</span>` : ""}${r.paidConflict ? `<span class="flag">دفع العميل لكن اليوم محجوز لغيره: غيّر الموعد أو أرجع المبلغ من ميسّر</span>` : ""}${r.priceMismatch ? `<span class="flag">السعر المعروض ${money(r.priceMismatch.shown||0)} أقل من المتوقع ${money(r.priceMismatch.expected||0)}: راجعه</span>` : ""}
       <span class="note">${esc(r.pkgName||"يوم كامل")}${r.guests?" · "+fmtN(r.guests)+" أشخاص":""}${r.extras&&r.extras.length?" · إضافات: "+r.extras.map(x=>esc(x.name)).join("، "):""}${r.total?" · الإجمالي "+money(r.total):""}${r.coupon?" (كوبون "+esc(r.coupon)+")":""}${r.deposit?" · العربون "+money(r.deposit):""}${r.note?" · "+esc(r.note):""}</span><div class="actions"></div>`;
     const a = it.querySelector(".actions");
     const mkBtn = (txt, cls, fn, dis) => { const b=document.createElement("button"); b.type="button"; b.className="btn sm "+(cls||""); b.textContent=txt; b.disabled=!!dis; b.onclick=()=>act(b,fn); a.appendChild(b); };
@@ -2229,6 +2262,94 @@ $("custList").addEventListener("click", e=>{ const b=e.target.closest("[data-blo
 function secFact(){ const v = Number(state.settings.security)||0; return v>0 ? fact("تأمين مسترد", money(v)+"<small style=\"color:var(--muted)\">يُدفع عند الوصول ويُرجع بعد فحص المكان</small>") : ""; }
 renderAvail(); renderInfoSections();
 
+/* ---------- online payment (Moyasar) ---------- */
+const payOn = ()=> !!window.MOYASAR_PK;
+state.payKind = "deposit";
+let mysrLoad = null;
+function loadMoyasar(){
+  if(!mysrLoad) mysrLoad = new Promise((res, rej)=>{
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "/vendor/moyasar/moyasar.css"; document.head.appendChild(l);
+    const s = document.createElement("script"); s.src = "/vendor/moyasar/moyasar.umd.js";
+    s.onload = ()=> res(window.Moyasar); s.onerror = ()=> rej(new Error("moyasar")); document.head.appendChild(s);
+  });
+  return mysrLoad;
+}
+function renderPayChoice(){
+  const box = $("payChoice"); if(!box) return;
+  const t = totals(), canSplit = t.dep > 0 && t.total > t.dep;
+  box.hidden = !payOn() || !t.total;
+  if(box.hidden) return;
+  if(!canSplit) state.payKind = "full";
+  box.innerHTML = `<strong>طريقة الدفع</strong>
+    <label class="check pay-opt"><input type="radio" name="payKind" value="full" ${state.payKind==="full"?"checked":""}><span><b>ادفع المبلغ كاملًا الآن</b><small>ما يبقى عليك شيء عند الوصول</small></span><b>${money(t.total)}</b></label>
+    ${canSplit ? `<label class="check pay-opt"><input type="radio" name="payKind" value="deposit" ${state.payKind==="deposit"?"checked":""}><span><b>ادفع العربون الآن</b><small>والمتبقي ${money(t.rest)} تدفعه من «حجوزاتي» قبل موعدك أو عند الوصول</small></span><b>${money(t.dep)}</b></label>` : ""}`;
+}
+document.addEventListener("change", e=>{ if(e.target.name==="payKind"){ state.payKind = e.target.value; renderPay(); } });
+const dueFor = (t)=> payOn() && state.payKind==="full" ? t.total : (t.dep || t.total);
+
+function payView(r, kind, amount){
+  const s = SECTIONS[r.section];
+  const label = kind==="full" ? "المبلغ كاملًا" : kind==="rest" ? "المبلغ المتبقي" : "العربون";
+  $("payStage").hidden = false; $("doneStage").hidden = true;
+  $("payTitle").textContent = "ادفع " + label;
+  $("paySummary").innerHTML = fact("الحجز", `${s.name.split(" · ")[0]} · ${niceDate(r.date)}`) + (r.total ? fact("الإجمالي", money(r.total)) : "") +
+    ((r.paidAmount||0) ? fact("المدفوع سابقًا", money(r.paidAmount)) : "") + fact("المطلوب الآن", money(amount), "strong") +
+    (kind==="deposit" && r.total ? fact("المتبقي بعد الدفع", money(Math.max(0, r.total - (r.paidAmount||0) - amount))) : "");
+  $("payMsg").hidden = true;
+  $("mysrBox").innerHTML = '<div class="mysr-form"></div>';
+  goStep(6);
+  loadMoyasar().then(M=>{
+    const back = location.origin + "/?pay=1";
+    M.init({
+      element: ".mysr-form", amount: Math.round(amount*100), currency: "SAR", language: "ar",
+      description: `مزرعة المحمدية · ${s.name.split(" · ")[0]} · ${r.date} · ${label}`,
+      publishable_api_key: window.MOYASAR_PK, callback_url: back,
+      methods: ["creditcard"], supported_networks: ["mada","visa","mastercard"],
+      metadata: { uid: state.uid, reqId: r.id, kind }
+    });
+  }).catch(()=> show($("payMsg"), "تعذّر تحميل نموذج الدفع. تأكد من الاتصال وحاول مرة ثانية.", true));
+}
+function startPay(reqId, kind){
+  const r = (state.mine||[]).find(x=>x.id===reqId); if(!r) return;
+  const rest = Math.max(0, (r.total||0) - (r.paidAmount||0));
+  const amount = kind==="rest" ? rest : kind==="full" ? rest : Math.min(r.deposit || rest, rest);
+  if(!(amount > 0)) return;
+  if($("sheet").hidden){ lastFocus = document.activeElement; $("sheet").hidden = false; document.body.style.overflow="hidden"; heroVids.forEach(v=>v.pause()); }
+  payView(r, kind, amount);
+}
+document.addEventListener("click", e=>{ const b = e.target.closest("[data-pay]"); if(!b) return; const [id, kind] = b.dataset.pay.split("|"); startPay(id, kind); });
+
+/* back from Moyasar: ?pay=1&id=...&status=...&message=... */
+async function handlePayReturn(){
+  const q = new URLSearchParams(location.search);
+  const id = q.get("id"); if(!q.get("pay") || !id) return;
+  history.replaceState(null, "", location.pathname + "#account");
+  const box = $("payResult"); box.hidden = false; box.className = "pay-result wait";
+  box.innerHTML = "<b>جارٍ التحقق من الدفع…</b>";
+  box.scrollIntoView({behavior:"smooth", block:"center"});
+  if(q.get("status") && q.get("status") !== "paid"){
+    box.className = "pay-result bad";
+    box.innerHTML = `<b>لم تكتمل عملية الدفع.</b><span>${esc(q.get("message")||"")} حاول مرة ثانية من زر الدفع في حجزك.</span>`;
+    return;
+  }
+  try{
+    const pay = await window.claude.use("pay"); const res = await pay.verify(id);
+    if(res && res.ok){
+      const rest = Math.max(0, (res.total||0) - (res.paidAmount||0));
+      box.className = "pay-result good";
+      box.innerHTML = res.notes && res.notes.includes("conflict")
+        ? `<b>تم استلام دفعتك ✅</b><span>لكن اليوم حُجز قبل لحظات لعميل آخر. سنتواصل معك لتغيير الموعد أو إعادة المبلغ.</span>`
+        : `<b>تم الدفع وتأكيد حجزك ✅</b><span>المدفوع ${money(res.paidAmount||0)}${rest ? ` · المتبقي ${money(rest)} تقدر تدفعه من هنا قبل موعدك أو عند الوصول.` : " · الحجز مدفوع بالكامل."}</span>`;
+    } else {
+      box.className = "pay-result bad";
+      box.innerHTML = `<b>لم يكتمل الدفع.</b><span>${esc(res?.message || "")} حاول مرة ثانية من زر الدفع في حجزك.</span>`;
+    }
+  }catch(err){
+    box.className = "pay-result bad";
+    box.innerHTML = `<b>تعذّر التحقق من الدفع الآن.</b><span>إذا خُصم المبلغ من بطاقتك، تواصل معنا عبر واتساب وأرسل رقم العملية: <span dir="ltr">${esc(id)}</span></span>`;
+  }
+}
+
 /* ---------- the visitor's own records ---------- */
 let mineOn = false;
 function subscribeMine(){
@@ -2284,6 +2405,7 @@ async function ensureUid(){
   db.collection("reviews").onSnapshot(snap=>{ state.reviews = snap.docs.map(d=>({id:d.id, ...d.data()})); renderReviews(); if(!$("sheet").hidden && state.step===1) renderStep1(); }, ()=>{});
 
   if(state.uid) subscribeMine();
+  handlePayReturn();
   if(false) db.doc("waitlist/"+state.uid).onSnapshot(s=>{ state.myWait = s.exists ? (s.data().items||[]) : []; if(!$("sheet").hidden && state.step===2) renderWait(); }, ()=>{});
   if(false) db.doc("reviewSubs/"+state.uid).onSnapshot(s=>{ state.myReviews = s.exists ? (s.data().items||[]) : []; renderMine(); }, ()=>{});
   if(false) db.doc("requests/"+state.uid).onSnapshot(s=>{ state.mine = s.exists ? (s.data().items||[]) : []; renderMine(); }, ()=>{});
