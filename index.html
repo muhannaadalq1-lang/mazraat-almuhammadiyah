@@ -1625,7 +1625,11 @@ $("lockForm").addEventListener("submit", async e=>{
   if(!email || !pw) return show($("lkMsg"),"اكتب البريد الإلكتروني وكلمة المرور.",true);
   btn.disabled = true;
   try{ const user = await window.claude.use("user"); await user.signIn(email, pw); location.hash = "#admin"; location.reload(); }
-  catch(err){ show($("lkMsg"), /confirm/i.test(err?.message||"") ? "الحساب غير مؤكد. فعّله من Supabase ثم حاول مرة ثانية." : "البريد الإلكتروني أو كلمة المرور غير صحيحة.", true); btn.disabled = false; }
+  catch(err){ const m = (err?.message||"") + " " + (err?.code||"");
+    show($("lkMsg"), /captcha/i.test(m) ? "تعذّر التحقق من أنك لست روبوتًا (Captcha). حدّث الصفحة وحاول مرة ثانية." :
+      /confirm/i.test(m) ? "الحساب غير مؤكد. فعّله من Supabase ثم حاول مرة ثانية." :
+      /invalid.*(credential|login)|invalid_credentials/i.test(m) ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." :
+      "تعذّر الدخول: " + (err?.message || "خطأ غير معروف"), true); btn.disabled = false; }
 });
 $("logoutBtn").onclick = async ()=>{ try{ const user = await window.claude.use("user"); await user.signOut(); }catch{} location.hash = "#admin"; location.reload(); };
 $("pwForm").addEventListener("submit", async e=>{
