@@ -1626,7 +1626,7 @@ $("lockForm").addEventListener("submit", async e=>{
   btn.disabled = true;
   try{ const user = await window.claude.use("user"); await user.signIn(email, pw); location.hash = "#admin"; location.reload(); }
   catch(err){ const m = (err?.message||"") + " " + (err?.code||"");
-    show($("lkMsg"), /captcha/i.test(m) ? "تعذّر التحقق من أنك لست روبوتًا (Captcha). التفاصيل: " + (err?.message || "") :
+    show($("lkMsg"), /captcha/i.test(m) ? "تعذّر التحقق من أنك لست روبوتًا (Captcha). التفاصيل: " + (err?.message || "") + (window.__captchaIssue ? " · " + window.__captchaIssue : "") :
       /confirm/i.test(m) ? "الحساب غير مؤكد. فعّله من Supabase ثم حاول مرة ثانية." :
       /invalid.*(credential|login)|invalid_credentials/i.test(m) ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." :
       "تعذّر الدخول: " + (err?.message || "خطأ غير معروف"), true); btn.disabled = false; }

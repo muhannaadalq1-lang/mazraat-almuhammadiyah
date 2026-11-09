@@ -15,15 +15,17 @@
     if(!tsLoad) tsLoad = new Promise((res, rej)=>{
       const s = document.createElement("script");
       s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true;
-      s.onload = ()=> res(window.turnstile); s.onerror = rej; document.head.appendChild(s);
+      s.onload = ()=> res(window.turnstile); s.onerror = ()=> rej(new Error("script blocked")); document.head.appendChild(s);
     });
     return tsLoad;
   }
   // Never blocks on its own: if the check can't run, it returns no token and Supabase decides.
   async function captchaToken(){
     if(!TURNSTILE_SITE_KEY) return undefined;
-    try{ return await Promise.race([getToken(), new Promise(r=>setTimeout(()=>r(undefined), 15000))]); }
-    catch(e){ console.warn("Turnstile:", e); return undefined; }
+    window.__captchaIssue = "";
+    try{ const t = await Promise.race([getToken(), new Promise(r=>setTimeout(()=>r(undefined), 15000))]);
+      if(!t) window.__captchaIssue = "انتهت مهلة التحقق (Turnstile timeout)"; return t; }
+    catch(e){ console.warn("Turnstile:", e); window.__captchaIssue = "Turnstile: " + (e?.message || e); return undefined; }
   }
   async function getToken(){
     const ts = await loadTurnstile();
@@ -32,7 +34,7 @@
       document.body.appendChild(box);
       const done = (fn, v)=>{ try{ ts.remove(id); }catch{} box.remove(); fn(v); };
       const id = ts.render(box, { sitekey: TURNSTILE_SITE_KEY, appearance: "interaction-only",
-        callback: t => done(res, t), "error-callback": ()=> done(rej, new Error("captcha")), "timeout-callback": ()=> done(rej, new Error("captcha")) });
+        callback: t => done(res, t), "error-callback": code => done(rej, new Error("error " + code)), "timeout-callback": ()=> done(rej, new Error("captcha")) });
     });
   }
 
