@@ -139,7 +139,11 @@
       async isOwner(){ return (await role()) === "owner"; },
       async email(){ const s = await session(); return s && !s.user.is_anonymous ? s.user.email : null; },
       async signIn(email, password){ const { error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken: await captchaToken() } }); if(error) throw error; roleP = null; },
-      async signOut(){ await sb.auth.signOut(); roleP = null; },
+      async signOut(){
+        try{ await sb.auth.signOut({ scope: "local" }); }catch{}
+        try{ Object.keys(localStorage).filter(k=>k.startsWith("sb-")).forEach(k=>localStorage.removeItem(k)); }catch{}
+        roleP = null;
+      },
       async setPassword(password){ const { error } = await sb.auth.updateUser({ password }); if(error) throw error; }
     },
     assets: {
