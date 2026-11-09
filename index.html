@@ -1305,7 +1305,8 @@ const OTP_ERR = { wait:"انتظر قليلًا قبل طلب رمز جديد.",
 async function sendOtp(d, channel, msgBox, btn){
   if(btn) btn.disabled = true;
   try{
-    const otp = await window.claude.use("otp"); const r = await otp.send(d, channel);
+    const otp = await window.claude.use("otp"); let r = await otp.send(d, channel);
+    if(channel === "whatsapp" && r && r.error === "send_failed") r = await otp.send(d, "sms");   // WhatsApp not ready → SMS
     if(!r || !r.ok){ if(r && r.wait) otpCooldown(r.wait); return show(msgBox, OTP_ERR[r && r.error] || OTP_ERR.network, true), false; }
     $("otpTo").textContent = "+966 "+d;
     $("otpLead").firstChild.textContent = r.channel === "sms" ? "أرسلنا رمز التحقق برسالة نصية إلى " : "أرسلنا رمز التحقق على واتساب إلى ";
