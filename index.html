@@ -1687,7 +1687,7 @@ $("lockForm").addEventListener("submit", async e=>{
       /invalid.*(credential|login)|invalid_credentials/i.test(m) ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." :
       "تعذّر الدخول: " + (err?.message || "خطأ غير معروف"), true); btn.disabled = false; }
 });
-$("logoutBtn").onclick = async ()=>{ try{ const user = await window.claude.use("user"); await user.signOut(); }catch{} location.hash = "#admin"; location.reload(); };
+$("logoutBtn").onclick = async ()=>{ try{ const user = await window.claude.use("user"); await user.signOut(); }catch{} try{ sessionStorage.clear(); }catch{} location.replace(location.origin + "/#home"); location.reload(); };
 $("pwForm").addEventListener("submit", async e=>{
   e.preventDefault();
   const pw = $("pwNew").value;
