@@ -4,8 +4,32 @@
 (function(){
   const SUPABASE_URL = "https://vnrujdpzmvenkauexppx.supabase.co";
   const SUPABASE_KEY = "sb_publishable_7wQLtrvohnaveuIU7Y-CKg_wFArC4aX"; // publishable key: safe in the browser, access is enforced by row-level security
+  // Cloudflare Turnstile site key (public). Leave empty to run without the bot check.
+  const TURNSTILE_SITE_KEY = "";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   window.sb = sb;
+
+  /* ---------- bot check (Cloudflare Turnstile, invisible) ---------- */
+  let tsLoad = null;
+  function loadTurnstile(){
+    if(!tsLoad) tsLoad = new Promise((res, rej)=>{
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true;
+      s.onload = ()=> res(window.turnstile); s.onerror = rej; document.head.appendChild(s);
+    });
+    return tsLoad;
+  }
+  async function captchaToken(){
+    if(!TURNSTILE_SITE_KEY) return undefined;
+    const ts = await loadTurnstile();
+    return new Promise((res, rej)=>{
+      const box = document.createElement("div"); box.style.cssText = "position:fixed;bottom:12px;left:12px;z-index:70";
+      document.body.appendChild(box);
+      const done = (fn, v)=>{ try{ ts.remove(id); }catch{} box.remove(); fn(v); };
+      const id = ts.render(box, { sitekey: TURNSTILE_SITE_KEY, appearance: "interaction-only",
+        callback: t => done(res, t), "error-callback": ()=> done(rej, new Error("captcha")), "timeout-callback": ()=> done(rej, new Error("captcha")) });
+    });
+  }
 
   /* ---------- session & roles ---------- */
   let roleP = null;
@@ -17,7 +41,7 @@
   }
   async function ensureUser(){
     let s = await session();
-    if(!s){ const { data, error } = await sb.auth.signInAnonymously(); if(error) throw error; s = data.session; }
+    if(!s){ const { data, error } = await sb.auth.signInAnonymously({ options: { captchaToken: await captchaToken() } }); if(error) throw error; s = data.session; }
     return s.user.id;
   }
 
@@ -86,7 +110,7 @@
       async canEdit(){ return !!(await role()); },
       async isOwner(){ return (await role()) === "owner"; },
       async email(){ const s = await session(); return s && !s.user.is_anonymous ? s.user.email : null; },
-      async signIn(email, password){ const { error } = await sb.auth.signInWithPassword({ email, password }); if(error) throw error; roleP = null; },
+      async signIn(email, password){ const { error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken: await captchaToken() } }); if(error) throw error; roleP = null; },
       async signOut(){ await sb.auth.signOut(); roleP = null; },
       async setPassword(password){ const { error } = await sb.auth.updateUser({ password }); if(error) throw error; }
     },
