@@ -5,7 +5,7 @@
   const SUPABASE_URL = "https://vnrujdpzmvenkauexppx.supabase.co";
   const SUPABASE_KEY = "sb_publishable_7wQLtrvohnaveuIU7Y-CKg_wFArC4aX"; // publishable key: safe in the browser, access is enforced by row-level security
   // Cloudflare Turnstile site key (public). Leave empty to run without the bot check.
-  const TURNSTILE_SITE_KEY = "";
+  const TURNSTILE_SITE_KEY = "0x4AAAAAAF6H2ktIAJSFsugu";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   window.sb = sb;
 
@@ -19,8 +19,13 @@
     });
     return tsLoad;
   }
+  // Never blocks on its own: if the check can't run, it returns no token and Supabase decides.
   async function captchaToken(){
     if(!TURNSTILE_SITE_KEY) return undefined;
+    try{ return await Promise.race([getToken(), new Promise(r=>setTimeout(()=>r(undefined), 15000))]); }
+    catch(e){ console.warn("Turnstile:", e); return undefined; }
+  }
+  async function getToken(){
     const ts = await loadTurnstile();
     return new Promise((res, rej)=>{
       const box = document.createElement("div"); box.style.cssText = "position:fixed;bottom:12px;left:12px;z-index:70";
