@@ -113,6 +113,12 @@
     return api;
   }
 
+  async function call(fn, body){
+    const { data, error } = await sb.functions.invoke(fn, { body });
+    if(error){ let detail = null; try{ detail = await error.context?.json?.(); }catch{} return detail || { ok:false, error:"network" }; }
+    return data;
+  }
+
   const caps = {
     pay: {
       async verify(id){
@@ -120,6 +126,10 @@
         if(error){ let detail = null; try{ detail = await error.context?.json?.(); }catch{} throw Object.assign(new Error(error.message), { detail }); }
         return data;
       }
+    },
+    otp: {
+      async send(phone, channel){ await ensureUser(); return call("phone-otp", { action:"send", phone, channel }); },
+      async verify(phone, code){ await ensureUser(); return call("phone-otp", { action:"verify", phone, code }); }
     },
     db: { doc, collection },
     user: {

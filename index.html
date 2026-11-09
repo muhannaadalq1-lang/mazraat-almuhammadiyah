@@ -288,7 +288,8 @@ button.spec{cursor:pointer;justify-content:center;color:var(--muted);font:inheri
 .phone-in span{padding:10px 12px;background:var(--surface-2);color:var(--muted);font-size:14px;display:grid;place-items:center}
 .phone-in input{border:0;border-radius:0}
 .otp{display:flex;gap:10px;justify-content:center}
-.otp input{width:56px;height:60px;text-align:center;font-size:24px;font-weight:600;border-radius:14px}
+.otp input{width:200px;height:60px;text-align:center;font-size:26px;font-weight:600;letter-spacing:10px;border-radius:14px}
+.pay-btns button:disabled{opacity:.5}
 .sms{display:grid;gap:4px;background:var(--surface-2);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:14px}
 .sms-tag{justify-self:start;font-size:11px;background:var(--pending);border-radius:999px;padding:0 8px}
 .sms small{color:var(--muted);font-size:12px}
@@ -855,6 +856,7 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
           <div class="row2"><label for="oEvery">خصم الولاء: كل كم زيارة<input id="oEvery" type="number" min="2" inputmode="numeric" placeholder="مثال: 5"></label><label for="oLoy">نسبة خصم الولاء ٪<input id="oLoy" type="number" min="0" max="100" inputmode="numeric"></label></div>
           <div class="row3"><label for="oN1">المبيت لقسم واحد<input id="oN1" type="number" min="0" inputmode="numeric"></label><label for="oN2">المبيت للقسمين<input id="oN2" type="number" min="0" inputmode="numeric"></label><label for="oNOut">خروج المبيت<input id="oNOut" placeholder="١٠:٠٠ صباحًا"></label></div>
           <label for="oSec">تأمين مسترد يُدفع عند الوصول (ريال)<input id="oSec" type="number" min="0" inputmode="numeric" placeholder="0 = بدون تأمين"></label>
+          <label class="check"><input type="checkbox" id="oOtp"> <span>تحقق من جوال العميل برمز (واتساب أو SMS عبر Authentica) قبل الحجز</span></label>
           <p class="note">بطاقات الهدايا تضيفها من «كوبونات الخصم» بنوع «بطاقة هدية». باقات المناسبات (خطوبة، تخرج، اجتماع عمل) تضيفها من «الباقات».</p>
           <button class="btn sm" type="submit">احفظ</button><div id="offMsg" hidden></div>
         </form>
@@ -992,11 +994,10 @@ input,select,textarea{background:#fff!important;color:var(--fg)}
           <div class="sticky-cta"><button class="btn block-btn" type="submit">أرسل رمز التحقق</button></div>
         </form>
         <form id="otpForm" novalidate hidden>
-          <p class="muted">أدخل الرمز المرسل إلى <b dir="ltr" id="otpTo"></b></p>
-          <div class="sms" id="demoSms"></div>
-          <div class="otp" dir="ltr"><input inputmode="numeric" maxlength="1" aria-label="الرقم ١"><input inputmode="numeric" maxlength="1" aria-label="الرقم ٢"><input inputmode="numeric" maxlength="1" aria-label="الرقم ٣"><input inputmode="numeric" maxlength="1" aria-label="الرقم ٤"></div>
+          <p class="muted" id="otpLead">أدخل الرمز المرسل إلى <b dir="ltr" id="otpTo"></b></p>
+          <div class="otp" dir="ltr"><input id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••" aria-label="رمز التحقق"></div>
           <div id="otpMsg" hidden></div>
-          <button class="btn ghost sm" type="button" id="changePhone">تغيير الرقم</button>
+          <div class="pay-btns"><button class="btn ghost sm" type="button" id="resendOtp">أعد الإرسال</button><button class="btn ghost sm" type="button" id="smsOtp">أرسل برسالة SMS</button><button class="btn ghost sm" type="button" id="changePhone">تغيير الرقم</button></div>
           <div class="sticky-cta"><button class="btn block-btn" type="submit">تحقق</button></div>
         </form>
       </div>
@@ -1177,7 +1178,7 @@ let lastFocus=null, showAllSpecs=false;
 const sheetBox = $("sheetBox");
 const money = n => fmtN(Math.round(n))+" ريال";
 function fact(label, value, cls){ return `<div class="fact${cls?" "+cls:""}"><span>${label}</span><b>${value}</b></div>`; }
-const otpOn = ()=> !!state.settings.otpEnabled;   // turned on once a real SMS provider is connected
+const otpOn = ()=> !!state.settings.otpEnabled;   // codes are sent by the phone-otp function (Authentica)
 const activeSteps = ()=> otpOn() ? [1,2,3,4,5] : [1,2,4,5];
 
 /* packages */
@@ -1294,33 +1295,54 @@ function renderSel(){
 try{ state.verified = sessionStorage.getItem("vPhone") || null; }catch{ state.verified = null; }
 function normPhone(v){ let d = String(v).replace(/\D/g,""); if(d.startsWith("966")) d = d.slice(3); if(d.startsWith("0")) d = d.slice(1); return d; }
 function renderVerify(){ $("phoneForm").hidden = false; $("otpForm").hidden = true; $("phoneMsg").hidden = true; }
+let otpTimer = null;
+function otpCooldown(sec){
+  clearInterval(otpTimer); const btns = [$("resendOtp"), $("smsOtp")];
+  const tick = ()=>{ btns.forEach(b=>{ b.disabled = sec > 0; }); $("resendOtp").textContent = sec > 0 ? `أعد الإرسال (${sec})` : "أعد الإرسال"; if(sec-- <= 0) clearInterval(otpTimer); };
+  tick(); otpTimer = setInterval(tick, 1000);
+}
+const OTP_ERR = { wait:"انتظر قليلًا قبل طلب رمز جديد.", too_many:"طلبت رموزًا كثيرة. حاول بعد ساعة أو تواصل معنا عبر واتساب.", send_failed:"تعذّر إرسال الرمز. تأكد من الرقم وحاول مرة ثانية.", bad_phone:"رقم الجوال غير صحيح.", not_configured:"خدمة التحقق غير مفعّلة حاليًا. تواصل معنا عبر واتساب.", network:"تعذّر الاتصال. تأكد من الإنترنت وحاول مرة ثانية." };
+async function sendOtp(d, channel, msgBox, btn){
+  if(btn) btn.disabled = true;
+  try{
+    const otp = await window.claude.use("otp"); const r = await otp.send(d, channel);
+    if(!r || !r.ok){ if(r && r.wait) otpCooldown(r.wait); return show(msgBox, OTP_ERR[r && r.error] || OTP_ERR.network, true), false; }
+    $("otpTo").textContent = "+966 "+d;
+    $("otpLead").firstChild.textContent = r.channel === "sms" ? "أرسلنا رمز التحقق برسالة نصية إلى " : "أرسلنا رمز التحقق على واتساب إلى ";
+    otpCooldown(60); return true;
+  }catch{ show(msgBox, OTP_ERR.network, true); return false; }
+  finally{ if(btn) btn.disabled = false; }
+}
 $("phoneForm").addEventListener("submit", async e=>{
   e.preventDefault();
   const d = normPhone($("vPhone").value);
   if(!/^5\d{8}$/.test(d)) return show($("phoneMsg"),"اكتب رقم جوال سعودي صحيح يبدأ بـ ٥ ومكوّن من ٩ أرقام.",true);
   if(await isBlocked(d)) return show($("phoneMsg"),"تعذّر إتمام الحجز بهذا الرقم. تواصل معنا عبر واتساب.",true);
-  state.pendingPhone = "0"+d; state.otp = String(Math.floor(1000+Math.random()*9000));
-  $("otpTo").textContent = "+966 "+d;
-  $("demoSms").innerHTML = `<span class="sms-tag">رسالة تجريبية</span><span>مزرعة المحمدية: رمز التحقق الخاص بك هو <b dir="ltr">${state.otp}</b></span><small>في النسخة النهائية يصل الرمز برسالة نصية على جوالك.</small>`;
+  if(!(await sendOtp(d, "whatsapp", $("phoneMsg"), e.submitter))) return;
+  state.pendingPhone = "0"+d;
   $("phoneForm").hidden = true; $("otpForm").hidden = false; $("otpMsg").hidden = true;
-  const ins = $("otpForm").querySelectorAll(".otp input"); ins.forEach(i=>i.value=""); ins[0].focus();
+  $("otpCode").value = ""; $("otpCode").focus();
 });
 $("changePhone").onclick = renderVerify;
-$("otpForm").querySelector(".otp").addEventListener("input", e=>{
-  const i = e.target; i.value = i.value.replace(/\D/g,"").slice(-1);
-  if(i.value && i.nextElementSibling) i.nextElementSibling.focus();
-  const code = [...$("otpForm").querySelectorAll(".otp input")].map(x=>x.value).join("");
-  if(code.length===4) $("otpForm").requestSubmit();
+$("resendOtp").onclick = e=> sendOtp(normPhone(state.pendingPhone), "whatsapp", $("otpMsg"), e.currentTarget).then(ok=> ok && show($("otpMsg"),"أرسلنا رمزًا جديدًا."));
+$("smsOtp").onclick = e=> sendOtp(normPhone(state.pendingPhone), "sms", $("otpMsg"), e.currentTarget).then(ok=> ok && show($("otpMsg"),"أرسلنا الرمز برسالة نصية."));
+$("otpCode").addEventListener("input", e=>{
+  e.target.value = e.target.value.replace(/\D/g,"").slice(0,6);
+  if(e.target.value.length === 6) $("otpForm").requestSubmit();
 });
-$("otpForm").querySelector(".otp").addEventListener("keydown", e=>{
-  if(e.key==="Backspace" && !e.target.value && e.target.previousElementSibling) e.target.previousElementSibling.focus();
-});
-$("otpForm").addEventListener("submit", e=>{
-  e.preventDefault();
-  const code = [...$("otpForm").querySelectorAll(".otp input")].map(x=>x.value).join("");
-  if(code !== state.otp) return show($("otpMsg"),"الرمز غير صحيح. تأكد منه وحاول مرة ثانية.",true);
-  state.verified = state.pendingPhone; try{ sessionStorage.setItem("vPhone", state.verified); }catch{}
-  goStep(4);
+let otpBusy = false;
+$("otpForm").addEventListener("submit", async e=>{
+  e.preventDefault(); if(otpBusy) return;
+  const code = $("otpCode").value.replace(/\D/g,"");
+  if(code.length < 4) return show($("otpMsg"),"اكتب الرمز كاملًا.",true);
+  otpBusy = true;
+  try{
+    const otp = await window.claude.use("otp"); const r = await otp.verify(normPhone(state.pendingPhone), code);
+    if(!r || !r.ok) return show($("otpMsg"), r && r.error==="wrong_code" ? "الرمز غير صحيح أو انتهت صلاحيته. تأكد منه أو اطلب رمزًا جديدًا." : (OTP_ERR[r && r.error] || OTP_ERR.network), true);
+    state.verified = state.pendingPhone; try{ sessionStorage.setItem("vPhone", state.verified); }catch{}
+    goStep(4);
+  }catch{ show($("otpMsg"), OTP_ERR.network, true); }
+  finally{ otpBusy = false; }
 });
 
 /* step 4: cart */
@@ -2160,10 +2182,11 @@ async function setBlocked(c, block){
 function renderOffersAdmin(){
   const st = state.settings, lv = st.loyalty||{};
   [["oMid", st.midweekPct], ["oEvery", lv.every], ["oLoy", lv.pct], ["oSec", st.security], ["oN1", (st.overnight||{}).s1], ["oN2", (st.overnight||{}).both], ["oNOut", (st.overnight||{}).out]].forEach(([id,v])=>{ if(document.activeElement!==$(id)) $(id).value = v || ""; });
+  $("oOtp").checked = !!st.otpEnabled;
 }
 $("offForm").addEventListener("submit", e=>{ e.preventDefault();
   act(e.submitter||$("offForm").querySelector("button"), async ()=>{
-    await state.db.doc("settings/main").set({...state.settings, midweekPct:Number($("oMid").value)||0, loyalty:{every:Number($("oEvery").value)||0, pct:Number($("oLoy").value)||0}, security:Number($("oSec").value)||0, overnight:{s1:Number($("oN1").value)||0, s2:Number($("oN1").value)||0, both:Number($("oN2").value)||0, out:$("oNOut").value.trim()}});
+    await state.db.doc("settings/main").set({...state.settings, midweekPct:Number($("oMid").value)||0, loyalty:{every:Number($("oEvery").value)||0, pct:Number($("oLoy").value)||0}, security:Number($("oSec").value)||0, overnight:{s1:Number($("oN1").value)||0, s2:Number($("oN1").value)||0, both:Number($("oN2").value)||0, out:$("oNOut").value.trim()}, otpEnabled:$("oOtp").checked});
     show($("offMsg"),"حُفظت العروض."); }); });
 
 /* ---------- FAQ, rules, license editor ---------- */
