@@ -1458,7 +1458,7 @@ function showDone(r, saved){
     (r.in?fact("وقت الدخول", esc(r.in)):"") + (r.out?fact("وقت الخروج", esc(r.out)):"") +
     (r.total?fact("الإجمالي", money(r.total)):"") + (r.deposit?fact("العربون المطلوب", money(r.deposit)+"<small>غير مسترد قبل الموعد بأقل من ٤٨ ساعة</small>", "strong"):"") + (r.deposit && r.total ? fact("المتبقي عند الوصول", money(Math.max(0, r.total-r.deposit))) : "") + fact("الاسم", esc(r.name));
   const text = waText(r);
-  $("doneWa").innerHTML = `<pre></pre><div class="actions">${num?`<a class="btn ${saved?"sm":"block-btn"}" target="_blank" rel="noopener" href="https://wa.me/${num}?text=${encodeURIComponent(text)}">${saved?"أرسل التفاصيل عبر واتساب":"أرسل الطلب على واتساب"}</a>`:""}<button class="btn ghost sm" type="button" id="copyWa">انسخ الرسالة</button></div>${num?`<p class="note">رقم المزرعة: <span dir="ltr">+${num}</span></p>`:""}`;
+  $("doneWa").innerHTML = `<pre></pre><div class="actions">${num?`<a class="btn ${saved?"sm":"block-btn"}" href="https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(text)}">${saved?"أرسل التفاصيل عبر واتساب":"أرسل الطلب على واتساب"}</a>`:""}<button class="btn ghost sm" type="button" id="copyWa">انسخ الرسالة</button></div>${num?`<p class="note">رقم المزرعة: <span dir="ltr">+${num}</span></p>`:""}`;
   $("doneWa").hidden = saved && !num;
   if(saved) $("doneFacts").after($("doneWa")); else $("doneFacts").before($("doneWa"));   // WhatsApp mode: the send button comes first
   $("doneWa").querySelector("pre").textContent = text;
